@@ -1,6 +1,7 @@
-from flask import Flask, render_template, redirect, request
+from flask import Flask, render_template, redirect, request,make_response, jsonify
 from pony.flask import Pony
 from pony.orm import Database, Required, Optional
+from http import HTTPStatus
 
 db = Database()
 
@@ -23,27 +24,56 @@ def index():
       "name": d[1],
       "desc": d[2]
     })
-  return render_template("index.html", datas=datas)
+  respon={
+    "data": datas,
+    "message": "ok"
+  }
+  return jsonify(respon), HTTPStatus.OK
 
 @app.route("/create", methods=["POST"])
 def create():
-  name_req = request.form.get("name")
-  desc_req = request.form.get("desc")
+  bodyJson = request.json
+  print(bodyJson)
   
-  query = f"insert into task(name, description) values('{name_req}', '{desc_req}')"
+  query = f"insert into task(name, description) values('{bodyJson['name']}', '{bodyJson['desc']}')"
   db.execute(query)
-  return redirect("/")
+  respon = {
+    "data": "berhasil memasukkan data",
+    "message": "ok"
+  }
+  return jsonify(respon), HTTPStatus.CREATED
 
 @app.route("/detail/<id>")
 def detail(id):
-  query=f"select name, description from public.task where id={id}"
-  data = []
-  for d in db.execute(query):
-    data.append({
-      "name": d[0],
-      "desc": d[1]
-    })
-  return render_template("detail.html", data=data[0])
+  try:
+    query=f"select name, description from public.task where id={id}"
+    data = []
+    for d in db.execute(query):
+      data.append({
+        "name": d[0],
+        "desc": d[1]
+      })
+    
+    if not data:
+      respon={
+        "data": "no data",
+        "message": "bad"
+      }
+      return jsonify(respon), HTTPStatus.BAD_REQUEST
+    
+    respon = {
+      "data": data[0],
+      "message": "ok"
+    }
+    return jsonify(respon), HTTPStatus.OK
+  
+  except Exception as err:
+    respon={
+      "data": str(err),
+      "message": "bad"
+    }
+    return jsonify(respon), HTTPStatus.BAD_GATEWAY
+    
 
 @app.route("/update/<id>")
 def update(id):
